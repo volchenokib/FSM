@@ -1,4 +1,14 @@
 <template>
+  <h2>Finite-state machine</h2>
+
+  <el-button @click="send('TOGGLE')">
+    {{
+      state.value === "inactive"
+        ? "Click to activate"
+        : "Active! Click to deactivate"
+    }}
+  </el-button>
+
   <el-form>
     <el-form-item>
       <el-input v-model="pageUrl" placeholder="enter the link to your website">
@@ -6,37 +16,63 @@
     </el-form-item>
     <el-button type="primary" @click="sendUrl">Submit</el-button>
   </el-form>
-  <h2>Heatmap</h2>
-  <div
-    class="heatmap__container"
-    :style="{ backgroundImage: 'url(' + mediaLink + ')' }"
-  ></div>
 </template>
 
 <script>
 /* eslint-disable */
+import { ref } from 'vue'
 import axios from "axios";
+import { useMachine } from '@xstate/vue';
+import { createMachine } from 'xstate';
+import { getSimplePaths } from '@xstate/graph';
+import { interpret } from 'xstate';
+
+
+const toggleMachine = createMachine({
+  id: 'toggle',
+  initial: 'inactive',
+  states: {
+    inactive: {
+      on: { TOGGLE: 'active' }
+    },
+    active: {
+      on: { TOGGLE: 'inactive' }
+    }
+  }
+});
+
+const service = interpret(toggleMachine, { devTools: false });
+const paths = getSimplePaths(toggleMachine);
+
 export default {
   name: "App",
-  data() {
-    return {
-      pageUrl: "",
-      mediaLink:""
-    };
-  },
-  methods: {
-    async sendUrl() {
-      console.log("pageUrl:", this.pageUrl);
+  setup() {
+     const { state, send } = useMachine(toggleMachine, { devTools: true });
+     
+     const pageUrl = ref('');
+     const mediaLink = ref('');
+
+     const  sendUrl = async ()=> {
+      console.log("pageUrl:", pageUrl.value);
       const response = await axios.post(
         "https://us-central1-heatmapp-get.cloudfunctions.net/screenshotProcessing",
         // "https://us-central1-heatmap-e4549.cloudfunctions.net/screenshotProcessing",
         // "http://localhost:5001/heatmap-e4549/us-central1/screenshotProcessing",
-        { screenshotUrl: this.pageUrl }
+        { screenshotUrl: pageUrl.value }
       );
       console.log('response.data', response.data)
-      this.mediaLink = response.data.mediaLink
+      mediaLink.value = response.data.mediaLink
     }
-  },
+
+    return {
+      pageUrl,
+      mediaLink,
+      sendUrl,
+      state,
+      send
+    };
+  }
+
 };
 </script>
 
